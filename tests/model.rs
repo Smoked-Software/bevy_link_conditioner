@@ -241,3 +241,28 @@ fn presets_condition_something() {
         assert!(worst >= Duration::from_millis(5), "{name}");
     }
 }
+
+#[test]
+fn a_clean_stream_never_times_out() {
+    // No latency of its own over a few milliseconds of real link, packets
+    // arriving in bursts as a slow frame would hand them over.
+    let mut link = Link::new(Mode::Stream, Direction::default(), 1);
+    link.set_round_trip(Duration::from_millis(3));
+    let mut delivered = 0;
+    for frame in 0..200u64 {
+        let at = Duration::from_millis(frame * 300);
+        for i in 0..60 {
+            link.push(at + Duration::from_micros(i * 100), i, 200);
+        }
+        while link.pop_ready(at + Duration::from_millis(299)).is_some() {
+            delivered += 1;
+        }
+    }
+    let stats = link.stats();
+    assert_eq!(delivered, 200 * 60, "{stats}");
+    assert_eq!(
+        (stats.timeouts, stats.max_delay),
+        (0, Duration::from_millis(3)),
+        "{stats}"
+    );
+}

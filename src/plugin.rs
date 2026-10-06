@@ -8,14 +8,19 @@
 //! does. Held packets live in [`ConditionedLink`] until they are due, so
 //! aeronet's own buffer clearing never sees them. Time is real time, never
 //! `Time<Virtual>`: a slowed-down game still has a real-time network.
+//!
+//! The emulated stream times its loss recovery on the configured round trip
+//! (`up.latency + down.latency`), not on the transport's RTT: that one also
+//! counts the frames packets wait for at both ends, which a kernel's TCP
+//! never sees.
 
 use core::time::Duration;
 
 use aeronet_io::{IoSystems, Session, bytes::Bytes, packet::RecvPacket, server::Server};
-use aeronet_transport::{Transport, TransportSystems};
+use aeronet_transport::TransportSystems;
 use bevy::{platform::time::Instant, prelude::*};
 
-use crate::{Link, LinkConditioner, link::mix_seed};
+use crate::{Direction, Link, LinkConditioner, link::mix_seed};
 
 /// Conditions sessions: each one with a [`LinkConditioner`] component, and
 /// every new one while a [`DefaultLinkConditioner`] exists.
@@ -84,9 +89,15 @@ impl ConditionedLink {
             epoch: Instant::now(),
             seed: config.seed,
             server_side,
-            up: Link::new(config.mode, config.up, mix_seed(config.seed, salt)),
-            down: Link::new(config.mode, config.down, mix_seed(config.seed, salt | 1)),
+            up: Self::link(config, config.up, mix_seed(config.seed, salt)),
+            down: Self::link(config, config.down, mix_seed(config.seed, salt | 1)),
         }
+    }
+
+    fn link(config: &LinkConditioner, direction: Direction, seed: u64) -> Link<Bytes> {
+        let mut link = Link::new(config.mode, direction, seed);
+        link.set_round_trip(config.up.latency + config.down.latency);
+        link
     }
 
     /// `(incoming, outgoing)` for this end of the link.
@@ -183,8 +194,12 @@ fn configure(
         let server_side = child_of.is_some_and(|child_of| servers.contains(child_of.parent()));
         match link {
             Some(mut link) if config.enabled && config.seed == link.seed => {
-                link.up.set_config(config.mode, config.up);
-                link.down.set_config(config.mode, config.down);
+                let link = &mut *link;
+                let rtt = config.up.latency + config.down.latency;
+                for (way, direction) in [(&mut link.up, config.up), (&mut link.down, config.down)] {
+                    way.set_config(config.mode, direction);
+                    way.set_round_trip(rtt);
+                }
             }
             link => {
                 if let Some(mut link) = link {
@@ -234,22 +249,8 @@ fn condition_incoming(mut sessions: Query<(&mut Session, &mut ConditionedLink)>)
     }
 }
 
-fn condition_outgoing(
-    mut sessions: Query<(
-        &mut Session,
-        &mut ConditionedLink,
-        &LinkConditioner,
-        Option<&Transport>,
-    )>,
-) {
-    for (mut session, mut link, config, transport) in &mut sessions {
-        // The emulated round trip: ours on top of the real link's, which the
-        // transport's shortest RTT sample includes.
-        let ours = config.up.latency + config.down.latency;
-        let rtt = transport.map_or(ours, |transport| transport.rtt().min().max(ours));
-        link.up.set_round_trip(rtt);
-        link.down.set_round_trip(rtt);
-
+fn condition_outgoing(mut sessions: Query<(&mut Session, &mut ConditionedLink)>) {
+    for (mut session, mut link) in &mut sessions {
         let at = Instant::now().saturating_duration_since(link.epoch);
         let (_, outgoing) = link.ways();
         for payload in core::mem::take(&mut session.send) {

@@ -27,6 +27,8 @@ use super::{HEADER_BYTES, Path, Stats};
 const RTO_MIN: Duration = Duration::from_millis(200);
 /// Linux doubles up to two minutes; this stops a little before.
 const MAX_BACKOFF: u32 = 8;
+/// Linux's floor on the tail loss probe timeout.
+const TLP_MIN: Duration = Duration::from_millis(10);
 /// Linux's initial congestion window, in segments.
 const INITIAL_WINDOW: f64 = 10.0;
 
@@ -229,7 +231,7 @@ impl<T> Stream<T> {
         Some(if self.probed {
             self.last_progress + (srtt + RTO_MIN) * (1 << self.backoff.min(MAX_BACKOFF))
         } else {
-            self.last_progress + srtt * 2
+            self.last_progress + (srtt * 2).max(TLP_MIN)
         })
     }
 
