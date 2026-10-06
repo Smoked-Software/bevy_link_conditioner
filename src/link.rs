@@ -64,6 +64,29 @@ pub struct Stats {
     pub stall: Duration,
     /// One-way delay of the last packet delivered.
     pub last_delay: Duration,
+    /// The longest one-way delay so far.
+    pub max_delay: Duration,
+}
+
+impl core::fmt::Display for Stats {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let ms = |duration: Duration| duration.as_millis();
+        write!(
+            f,
+            "sent {} delivered {} lost {} retransmits {} (timeouts {}) dropped {} duplicated {}, holding {} ({} B), delay {} ms (max {} ms)",
+            self.sent,
+            self.delivered,
+            self.lost,
+            self.retransmits,
+            self.timeouts,
+            self.dropped,
+            self.duplicated,
+            self.queued,
+            self.queued_bytes,
+            ms(self.last_delay),
+            ms(self.max_delay),
+        )
+    }
 }
 
 impl<T: Clone> Link<T> {
@@ -133,6 +156,7 @@ impl<T: Clone> Link<T> {
             let delay = arrived.saturating_sub(*sent);
             self.stats.delivered += 1;
             self.stats.last_delay = delay;
+            self.stats.max_delay = self.stats.max_delay.max(delay);
             self.history.push_back((*arrived, delay));
         }
         self.refresh(now);
