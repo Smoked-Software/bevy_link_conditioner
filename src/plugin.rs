@@ -191,14 +191,21 @@ fn configure(
                     // Off, or a new seed: whatever is held goes now.
                     let (incoming, outgoing) = link.ways();
                     let now = Instant::now();
-                    session.recv.extend(incoming.drain().map(|payload| RecvPacket { recv_at: now, payload }));
+                    session
+                        .recv
+                        .extend(incoming.drain().into_iter().map(|payload| RecvPacket {
+                            recv_at: now,
+                            payload,
+                        }));
                     session.send.extend(outgoing.drain());
                     commands.entity(entity).remove::<ConditionedLink>();
                 }
                 if config.enabled {
-                    commands
-                        .entity(entity)
-                        .insert(ConditionedLink::new(entity, server_side, config));
+                    commands.entity(entity).insert(ConditionedLink::new(
+                        entity,
+                        server_side,
+                        config,
+                    ));
                 }
             }
         }
@@ -219,7 +226,10 @@ fn condition_incoming(mut sessions: Query<(&mut Session, &mut ConditionedLink)>)
             incoming.push(sent, packet.payload, len);
         }
         while let Some(payload) = incoming.pop_ready(at) {
-            session.recv.push(RecvPacket { recv_at: now, payload });
+            session.recv.push(RecvPacket {
+                recv_at: now,
+                payload,
+            });
         }
     }
 }

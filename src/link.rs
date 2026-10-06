@@ -142,7 +142,9 @@ impl<T: Clone> Link<T> {
         self.stats.sent += 1;
         match &mut self.model {
             Model::Stream(stream) => stream.push(&mut self.path, &mut self.stats, now, item, len),
-            Model::Datagram(datagram) => datagram.push(&mut self.path, &mut self.stats, now, item, len),
+            Model::Datagram(datagram) => {
+                datagram.push(&mut self.path, &mut self.stats, now, item, len)
+            }
         }
         self.refresh(now);
     }
@@ -170,14 +172,14 @@ impl<T: Clone> Link<T> {
     }
 
     /// Everything held, in order, at once: for switching the link off.
-    pub fn drain(&mut self) -> impl Iterator<Item = T> + '_ {
+    pub fn drain(&mut self) -> Vec<T> {
         let model = core::mem::replace(&mut self.model, Model::new(self.mode));
         let items: Vec<T> = self.released.drain(..).chain(model.drain()).collect();
         self.stats.delivered += items.len() as u64;
         self.stats.queued = 0;
         self.stats.queued_bytes = 0;
         self.stats.stall = Duration::ZERO;
-        items.into_iter()
+        items
     }
 
     pub fn stats(&self) -> &Stats {
@@ -306,7 +308,8 @@ impl Path {
         }
         let departure = t.max(self.wire_free);
         let bits = ((len + HEADER_BYTES) * 8) as f64;
-        self.wire_free = departure + Duration::from_secs_f64(bits / (self.config.bandwidth as f64 * 1000.0));
+        self.wire_free =
+            departure + Duration::from_secs_f64(bits / (self.config.bandwidth as f64 * 1000.0));
         departure
     }
 

@@ -107,7 +107,14 @@ impl<T> Default for Stream<T> {
 }
 
 impl<T> Stream<T> {
-    pub(super) fn push(&mut self, path: &mut Path, stats: &mut Stats, now: Duration, item: T, len: usize) {
+    pub(super) fn push(
+        &mut self,
+        path: &mut Path,
+        stats: &mut Stats,
+        now: Duration,
+        item: T,
+        len: usize,
+    ) {
         self.advance(path, stats, now);
         let bytes = len + HEADER_BYTES;
         if self.sender_bytes > 0 && self.sender_bytes + bytes > path.config.send_buffer {
@@ -126,9 +133,18 @@ impl<T> Stream<T> {
     }
 
     /// The head of the stream, once it has arrived: `(sent, delivered, item)`.
-    pub(super) fn pop(&mut self, path: &mut Path, stats: &mut Stats, now: Duration) -> Option<(Duration, Duration, T)> {
+    pub(super) fn pop(
+        &mut self,
+        path: &mut Path,
+        stats: &mut Stats,
+        now: Duration,
+    ) -> Option<(Duration, Duration, T)> {
         self.advance(path, stats, now);
-        let arrival = self.segments.front()?.arrival.filter(|&arrival| arrival <= now)?;
+        let arrival = self
+            .segments
+            .front()?
+            .arrival
+            .filter(|&arrival| arrival <= now)?;
         let segment = self.segments.pop_front()?;
         self.first += 1;
         self.delivered = self.delivered.max(arrival);
@@ -141,19 +157,26 @@ impl<T> Stream<T> {
             .segments
             .front()
             .filter(|head| head.hit)
-            .map_or(Duration::ZERO, |head| now.saturating_sub(head.sent + path.config.latency));
+            .map_or(Duration::ZERO, |head| {
+                now.saturating_sub(head.sent + path.config.latency)
+            });
         (self.segments.len(), self.sender_bytes, stall)
     }
 
     pub(super) fn drain(self) -> Vec<T> {
-        self.segments.into_iter().map(|segment| segment.item).collect()
+        self.segments
+            .into_iter()
+            .map(|segment| segment.item)
+            .collect()
     }
 
     /// Plays every acknowledgement, resend and timer due by `now`, in order.
     fn advance(&mut self, path: &mut Path, stats: &mut Stats, now: Duration) {
         loop {
             let ack = self.acks.peek().map(|Reverse(ack)| (ack.at, Event::Ack));
-            let resend = self.next_resend().map(|(at, index)| (at, Event::Resend(index)));
+            let resend = self
+                .next_resend()
+                .map(|(at, index)| (at, Event::Resend(index)));
             let timer = self.timer(path).map(|at| (at, Event::Timer));
             let Some((at, event)) = [ack, resend, timer]
                 .into_iter()
@@ -181,7 +204,10 @@ impl<T> Stream<T> {
 
     /// Segments the sender believes are on the wire: what the window limits.
     fn in_flight(&self) -> usize {
-        self.flights.iter().filter(|flight| flight.due.is_none()).count()
+        self.flights
+            .iter()
+            .filter(|flight| flight.due.is_none())
+            .count()
     }
 
     /// The next resend RACK has scheduled and the window allows.
@@ -208,7 +234,10 @@ impl<T> Stream<T> {
     }
 
     fn on_ack(&mut self, path: &Path, ack: Ack) {
-        let Ok(index) = self.flights.binary_search_by_key(&ack.seq, |flight| flight.seq) else {
+        let Ok(index) = self
+            .flights
+            .binary_search_by_key(&ack.seq, |flight| flight.seq)
+        else {
             return;
         };
         let flight = self.flights.remove(index).expect("found");
@@ -259,7 +288,10 @@ impl<T> Stream<T> {
         let end = self.first + self.segments.len() as u64;
         while self.unsent < end
             && (self.in_flight() as f64) < self.cwnd
-            && !self.flights.iter().any(|flight| flight.due.is_some_and(|due| due <= at))
+            && !self
+                .flights
+                .iter()
+                .any(|flight| flight.due.is_some_and(|due| due <= at))
         {
             let bytes = self.segments[(self.unsent - self.first) as usize].bytes;
             if self.flights.is_empty() {
@@ -299,7 +331,11 @@ impl<T> Stream<T> {
         }
         let arrival = path.depart(at, flight.bytes - HEADER_BYTES) + path.delay();
         if let Some(segment) = segment {
-            segment.arrival = Some(segment.arrival.map_or(arrival, |earlier| earlier.min(arrival)));
+            segment.arrival = Some(
+                segment
+                    .arrival
+                    .map_or(arrival, |earlier| earlier.min(arrival)),
+            );
         }
         // The receiver acknowledges on arrival; the ACK takes the way back.
         let back = path.rtt().saturating_sub(path.config.latency);

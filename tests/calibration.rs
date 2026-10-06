@@ -26,10 +26,38 @@ struct Measured {
 
 /// `(down + up) / 2` of `analyze`/`onset` on `~/scratch/tcp-netem/out/<name>`.
 const MEASURED: [Measured; 4] = [
-    Measured { name: "rtt50_l2", one_way_ms: 25, loss: 2.0, stall_p50: 83.0, p99: 108.5, max: 201.5 },
-    Measured { name: "rtt100_l2", one_way_ms: 50, loss: 2.0, stall_p50: 133.0, p99: 184.0, max: 320.0 },
-    Measured { name: "rtt150_l2", one_way_ms: 75, loss: 2.0, stall_p50: 192.0, p99: 267.0, max: 476.0 },
-    Measured { name: "rtt300_l3", one_way_ms: 150, loss: 3.0, stall_p50: 379.0, p99: 684.0, max: 1173.0 },
+    Measured {
+        name: "rtt50_l2",
+        one_way_ms: 25,
+        loss: 2.0,
+        stall_p50: 83.0,
+        p99: 108.5,
+        max: 201.5,
+    },
+    Measured {
+        name: "rtt100_l2",
+        one_way_ms: 50,
+        loss: 2.0,
+        stall_p50: 133.0,
+        p99: 184.0,
+        max: 320.0,
+    },
+    Measured {
+        name: "rtt150_l2",
+        one_way_ms: 75,
+        loss: 2.0,
+        stall_p50: 192.0,
+        p99: 267.0,
+        max: 476.0,
+    },
+    Measured {
+        name: "rtt300_l3",
+        one_way_ms: 150,
+        loss: 3.0,
+        stall_p50: 379.0,
+        p99: 684.0,
+        max: 1173.0,
+    },
 ];
 
 const HZ: f64 = 30.0;
@@ -94,7 +122,11 @@ fn model(row: &Measured) -> Modelled {
     for seed in 0..SEEDS {
         let mut link = Link::new(Mode::Stream, direction, seed);
         let delays = one_way_delays(&mut link);
-        assert_eq!(delays.len(), (SECONDS * HZ) as usize, "a stream delivers everything");
+        assert_eq!(
+            delays.len(),
+            (SECONDS * HZ) as usize,
+            "a stream delivers everything"
+        );
         stalls.extend(stall_onsets(&delays, 2.0 * row.one_way_ms as f64));
         p99s.push(percentile(&delays, 0.99));
         maxes.push(delays.iter().copied().fold(0.0, f64::max));
@@ -113,7 +145,13 @@ fn stream_matches_measured_tcp() {
         let modelled = model(row);
         println!(
             "{:10} stall p50 {:5.0} (netem {:5.0})  p99 {:5.0} (netem {:5.0})  max {:5.0} (netem {:5.0})",
-            row.name, modelled.stall_p50, row.stall_p50, modelled.p99, row.p99, modelled.max, row.max
+            row.name,
+            modelled.stall_p50,
+            row.stall_p50,
+            modelled.p99,
+            row.p99,
+            modelled.max,
+            row.max
         );
         for (what, got, want, tolerance) in [
             ("stall p50", modelled.stall_p50, row.stall_p50, 0.10),
@@ -121,7 +159,10 @@ fn stream_matches_measured_tcp() {
             ("max", modelled.max, row.max, 0.25),
         ] {
             if (got / want - 1.0).abs() > tolerance {
-                failures.push(format!("{} {what}: {got:.0} ms vs measured {want:.0} ms", row.name));
+                failures.push(format!(
+                    "{} {what}: {got:.0} ms vs measured {want:.0} ms",
+                    row.name
+                ));
             }
         }
     }
@@ -148,7 +189,11 @@ fn jittery_profiles_track_measured_tcp() {
         };
         let mut all = Vec::new();
         for seed in 0..SEEDS {
-            all.extend(one_way_delays(&mut Link::new(Mode::Stream, direction, seed)));
+            all.extend(one_way_delays(&mut Link::new(
+                Mode::Stream,
+                direction,
+                seed,
+            )));
         }
         let got = [0.5, 0.9, 0.99].map(|q| percentile(&all, q));
         println!(

@@ -21,6 +21,8 @@ mod ui;
 pub use config::{Direction, LinkConditioner, Mode, PRESETS, ParseError};
 pub use link::{Link, Stats};
 #[cfg(feature = "bevy")]
-pub use plugin::{ConditionedLink, DefaultLinkConditioner, LinkConditionerPlugin, LinkConditionerSystems};
+pub use plugin::{
+    ConditionedLink, DefaultLinkConditioner, LinkConditionerPlugin, LinkConditionerSystems,
+};
 #[cfg(feature = "egui")]
 pub use ui::{LinkConditionerUi, LinkConditionerUiPlugin};

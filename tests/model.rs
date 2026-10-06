@@ -63,7 +63,10 @@ fn stream_drops_only_at_the_send_door() {
     let stats = link.stats().clone();
     assert!(stats.dropped > 0, "{stats:?}");
     assert_eq!(delivered.len() as u64 + stats.dropped, 6000);
-    assert!(delivered.windows(2).all(|pair| pair[0].0 < pair[1].0), "in order");
+    assert!(
+        delivered.windows(2).all(|pair| pair[0].0 < pair[1].0),
+        "in order"
+    );
 }
 
 #[test]
@@ -77,9 +80,18 @@ fn stream_bandwidth_queues_up_to_the_send_buffer() {
     };
     let mut link = Link::new(Mode::Stream, direction, 1);
     let delivered = run(&mut link, 30.0, 600, 3600);
-    let late: Vec<f64> = delivered[1800..].iter().map(|&(_, sent, at)| (at - sent).as_secs_f64()).collect();
-    let (low, high) = late.iter().fold((f64::MAX, 0.0_f64), |(low, high), &d| (low.min(d), high.max(d)));
-    println!("plateau {:.0}..{:.0} ms (netem rate128_over: 784..826 ms)", low * 1000.0, high * 1000.0);
+    let late: Vec<f64> = delivered[1800..]
+        .iter()
+        .map(|&(_, sent, at)| (at - sent).as_secs_f64())
+        .collect();
+    let (low, high) = late.iter().fold((f64::MAX, 0.0_f64), |(low, high), &d| {
+        (low.min(d), high.max(d))
+    });
+    println!(
+        "plateau {:.0}..{:.0} ms (netem rate128_over: 784..826 ms)",
+        low * 1000.0,
+        high * 1000.0
+    );
     assert!(low > 0.6 && high < 1.2, "plateau {low}..{high} s");
     assert!(link.stats().dropped > 0);
 }
@@ -105,13 +117,21 @@ fn stream_outage_recovers_on_the_backoff_clock() {
         let resumed: Vec<u128> = (1..6)
             .map(|outage| {
                 let up = Duration::from_millis(10_000 * outage + hold);
-                let first = delivered.iter().map(|&(.., at)| at).find(|&at| at > up).unwrap();
+                let first = delivered
+                    .iter()
+                    .map(|&(.., at)| at)
+                    .find(|&at| at > up)
+                    .unwrap();
                 (first - up).as_millis()
             })
             .collect();
-        println!("{hold} ms outage: first delivery {resumed:?} ms after the link returns (netem median {measured})");
+        println!(
+            "{hold} ms outage: first delivery {resumed:?} ms after the link returns (netem median {measured})"
+        );
         assert!(
-            resumed.iter().all(|&ms| ms * 2 > measured && ms < measured * 3 / 2),
+            resumed
+                .iter()
+                .all(|&ms| ms * 2 > measured && ms < measured * 3 / 2),
             "{resumed:?}"
         );
     }
@@ -133,7 +153,10 @@ fn datagram_loss_and_duplicates_match_the_settings() {
     let duplicated = stats.duplicated as f64 / (count - stats.lost) as f64;
     assert!((lost - 0.05).abs() < 0.003, "lost {lost}");
     assert!((duplicated - 0.02).abs() < 0.002, "duplicated {duplicated}");
-    assert_eq!(delivered.len() as u64, count - stats.lost + stats.duplicated);
+    assert_eq!(
+        delivered.len() as u64,
+        count - stats.lost + stats.duplicated
+    );
 }
 
 #[test]
@@ -168,9 +191,16 @@ fn datagram_queue_drops_the_excess() {
     };
     let mut link = Link::new(Mode::Datagram, direction, 1);
     let delivered = run(&mut link, 60.0, 1000, 3600);
-    let worst = delivered.iter().map(|&(_, sent, at)| at - sent).max().unwrap();
+    let worst = delivered
+        .iter()
+        .map(|&(_, sent, at)| at - sent)
+        .max()
+        .unwrap();
     assert!(link.stats().dropped > 1000);
-    assert!(worst < Duration::from_millis(150), "queue bounded: {worst:?}");
+    assert!(
+        worst < Duration::from_millis(150),
+        "queue bounded: {worst:?}"
+    );
 }
 
 #[test]
@@ -192,7 +222,8 @@ fn a_change_of_mode_releases_what_is_held() {
         link.push(Duration::from_millis(seq * 10), seq, 100);
     }
     link.set_config(Mode::Datagram, Direction::default());
-    let released: Vec<u64> = core::iter::from_fn(|| link.pop_ready(Duration::from_millis(100))).collect();
+    let released: Vec<u64> =
+        core::iter::from_fn(|| link.pop_ready(Duration::from_millis(100))).collect();
     assert_eq!(released, (0..10).collect::<Vec<_>>());
 }
 
@@ -202,7 +233,11 @@ fn presets_condition_something() {
         let conditioner = LinkConditioner::preset(name).unwrap();
         let mut link = Link::new(conditioner.mode, conditioner.down, 1);
         let delivered = run(&mut link, 30.0, 400, 30 * 30);
-        let worst = delivered.iter().map(|&(_, sent, at)| at - sent).max().unwrap();
+        let worst = delivered
+            .iter()
+            .map(|&(_, sent, at)| at - sent)
+            .max()
+            .unwrap();
         assert!(worst >= Duration::from_millis(5), "{name}");
     }
 }

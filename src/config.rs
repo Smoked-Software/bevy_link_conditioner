@@ -121,7 +121,10 @@ impl Direction {
         let base = Self::default();
         Some(match name {
             "clean" => base,
-            "lan" => Self { latency: ms(5), ..base },
+            "lan" => Self {
+                latency: ms(5),
+                ..base
+            },
             "transatlantic" => Self {
                 latency: ms(90),
                 jitter: ms(10),
@@ -294,7 +297,11 @@ impl FromStr for LinkConditioner {
 
     fn from_str(spec: &str) -> Result<Self, ParseError> {
         let mut link = Self::default();
-        for item in spec.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+        for item in spec
+            .split(',')
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+        {
             let Some((key, value)) = item.split_once('=') else {
                 match item {
                     "off" => link.enabled = false,
@@ -402,12 +409,45 @@ fn knobs(direction: &Direction) -> [(&'static str, Option<String>); 11] {
     let text = |differs: bool, text: String| differs.then_some(text);
     let outage = (direction.outage_every, direction.outage_hold);
     [
-        ("latency", text(direction.latency != base.latency, Ms(direction.latency).to_string())),
-        ("jitter", text(direction.jitter != base.jitter, Ms(direction.jitter).to_string())),
-        ("corr", text(direction.correlation != base.correlation, format!("{}%", direction.correlation))),
-        ("loss", text(direction.loss != base.loss, format!("{}%", direction.loss))),
-        ("burst", text(direction.burst != base.burst, Ms(direction.burst).to_string())),
-        ("bw", text(direction.bandwidth != base.bandwidth, format!("{}kbit", direction.bandwidth))),
+        (
+            "latency",
+            text(
+                direction.latency != base.latency,
+                Ms(direction.latency).to_string(),
+            ),
+        ),
+        (
+            "jitter",
+            text(
+                direction.jitter != base.jitter,
+                Ms(direction.jitter).to_string(),
+            ),
+        ),
+        (
+            "corr",
+            text(
+                direction.correlation != base.correlation,
+                format!("{}%", direction.correlation),
+            ),
+        ),
+        (
+            "loss",
+            text(direction.loss != base.loss, format!("{}%", direction.loss)),
+        ),
+        (
+            "burst",
+            text(
+                direction.burst != base.burst,
+                Ms(direction.burst).to_string(),
+            ),
+        ),
+        (
+            "bw",
+            text(
+                direction.bandwidth != base.bandwidth,
+                format!("{}kbit", direction.bandwidth),
+            ),
+        ),
         (
             "outage",
             text(
@@ -415,10 +455,34 @@ fn knobs(direction: &Direction) -> [(&'static str, Option<String>); 11] {
                 format!("{}/{}", Ms(outage.1), Ms(outage.0)),
             ),
         ),
-        ("sndbuf", text(direction.send_buffer != base.send_buffer, direction.send_buffer.to_string())),
-        ("queue", text(direction.queue != base.queue, Ms(direction.queue).to_string())),
-        ("reorder", text(direction.reorder != base.reorder, format!("{}%", direction.reorder))),
-        ("dup", text(direction.duplicate != base.duplicate, format!("{}%", direction.duplicate))),
+        (
+            "sndbuf",
+            text(
+                direction.send_buffer != base.send_buffer,
+                direction.send_buffer.to_string(),
+            ),
+        ),
+        (
+            "queue",
+            text(
+                direction.queue != base.queue,
+                Ms(direction.queue).to_string(),
+            ),
+        ),
+        (
+            "reorder",
+            text(
+                direction.reorder != base.reorder,
+                format!("{}%", direction.reorder),
+            ),
+        ),
+        (
+            "dup",
+            text(
+                direction.duplicate != base.duplicate,
+                format!("{}%", direction.duplicate),
+            ),
+        ),
     ]
 }
 
@@ -472,7 +536,11 @@ fn bytes(text: &str) -> Option<usize> {
     let text = text.to_ascii_lowercase();
     let number = text.strip_suffix("kib").or_else(|| text.strip_suffix('k'));
     match number {
-        Some(k) => k.trim().parse::<f64>().ok().map(|k| (k * 1024.0).round() as usize),
+        Some(k) => k
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .map(|k| (k * 1024.0).round() as usize),
         None => text.trim().parse().ok(),
     }
 }
@@ -486,7 +554,11 @@ mod tests {
         for name in PRESETS {
             let link: LinkConditioner = name.parse().unwrap();
             assert_eq!(link, LinkConditioner::preset(name).unwrap());
-            assert_eq!(link.to_string().parse::<LinkConditioner>().unwrap(), link, "{name}");
+            assert_eq!(
+                link.to_string().parse::<LinkConditioner>().unwrap(),
+                link,
+                "{name}"
+            );
         }
     }
 
@@ -509,7 +581,13 @@ mod tests {
 
     #[test]
     fn bad_specs_say_why() {
-        assert!("nowhere".parse::<LinkConditioner>().unwrap_err().0.contains("nowhere"));
+        assert!(
+            "nowhere"
+                .parse::<LinkConditioner>()
+                .unwrap_err()
+                .0
+                .contains("nowhere")
+        );
         assert!("loss=200%".parse::<LinkConditioner>().is_err());
         assert!("latency=-5ms".parse::<LinkConditioner>().is_err());
         assert!("sideways.loss=1%".parse::<LinkConditioner>().is_err());

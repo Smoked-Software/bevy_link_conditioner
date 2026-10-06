@@ -6,7 +6,9 @@ use core::time::Duration;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 
-use crate::{ConditionedLink, DefaultLinkConditioner, Direction, Link, LinkConditioner, Mode, PRESETS};
+use crate::{
+    ConditionedLink, DefaultLinkConditioner, Direction, Link, LinkConditioner, Mode, PRESETS,
+};
 
 /// The panel. Needs bevy_egui's `EguiPlugin` and [`crate::LinkConditionerPlugin`].
 pub struct LinkConditionerUiPlugin {
@@ -84,13 +86,21 @@ fn panel(
             match links.iter().next() {
                 Some(link) => live(ui, link),
                 None => {
-                    ui.weak(if edit.enabled { "No session yet." } else { "Off: packets pass straight through." });
+                    ui.weak(if edit.enabled {
+                        "No session yet."
+                    } else {
+                        "Off: packets pass straight through."
+                    });
                 }
             }
             ui.separator();
             let spec = edit.to_string();
             ui.horizontal(|ui| {
-                if ui.small_button("copy").on_hover_text("--net=<this> or NET_CONDITION=<this>").clicked() {
+                if ui
+                    .small_button("copy")
+                    .on_hover_text("--net=<this> or NET_CONDITION=<this>")
+                    .clicked()
+                {
                     ui.ctx().copy_text(spec.clone());
                 }
                 ui.code(&spec);
@@ -121,16 +131,21 @@ fn settings(ui: &mut egui::Ui, state: &mut LinkConditionerUi, edit: &mut LinkCon
     ui.horizontal(|ui| {
         let current = PRESETS
             .into_iter()
-            .find(|name| Direction::preset(name).is_some_and(|preset| edit.up == preset && edit.down == preset))
+            .find(|name| {
+                Direction::preset(name)
+                    .is_some_and(|preset| edit.up == preset && edit.down == preset)
+            })
             .unwrap_or("custom");
-        egui::ComboBox::from_id_salt("preset").selected_text(current).show_ui(ui, |ui| {
-            for name in PRESETS {
-                if ui.selectable_label(name == current, name).clicked() {
-                    let preset = Direction::preset(name).expect("listed");
-                    (edit.up, edit.down) = (preset, preset);
+        egui::ComboBox::from_id_salt("preset")
+            .selected_text(current)
+            .show_ui(ui, |ui| {
+                for name in PRESETS {
+                    if ui.selectable_label(name == current, name).clicked() {
+                        let preset = Direction::preset(name).expect("listed");
+                        (edit.up, edit.down) = (preset, preset);
+                    }
                 }
-            }
-        });
+            });
         ui.label("seed");
         ui.add(egui::DragValue::new(&mut edit.seed));
         ui.checkbox(&mut state.same_both_ways, "same both ways");
@@ -142,9 +157,11 @@ fn settings(ui: &mut egui::Ui, state: &mut LinkConditionerUi, edit: &mut LinkCon
         egui::CollapsingHeader::new(egui::RichText::new("up: client to server").color(UP_COLOR))
             .default_open(true)
             .show(ui, |ui| direction(ui, "up", &mut edit.up, edit.mode));
-        egui::CollapsingHeader::new(egui::RichText::new("down: server to client").color(DOWN_COLOR))
-            .default_open(true)
-            .show(ui, |ui| direction(ui, "down", &mut edit.down, edit.mode));
+        egui::CollapsingHeader::new(
+            egui::RichText::new("down: server to client").color(DOWN_COLOR),
+        )
+        .default_open(true)
+        .show(ui, |ui| direction(ui, "down", &mut edit.down, edit.mode));
     }
 }
 
@@ -160,7 +177,13 @@ fn direction(ui: &mut egui::Ui, id: &str, direction: &mut Direction, mode: Mode)
             egui::Slider::new(&mut direction.bandwidth, 0..=20_000)
                 .logarithmic(true)
                 .suffix(" kbit/s")
-                .custom_formatter(|kbit, _| if kbit == 0.0 { "off".into() } else { format!("{kbit:.0}") }),
+                .custom_formatter(|kbit, _| {
+                    if kbit == 0.0 {
+                        "off".into()
+                    } else {
+                        format!("{kbit:.0}")
+                    }
+                }),
         );
         ui.end_row();
         millis(ui, "outage every", &mut direction.outage_every, 60_000.0);
@@ -168,7 +191,11 @@ fn direction(ui: &mut egui::Ui, id: &str, direction: &mut Direction, mode: Mode)
         match mode {
             Mode::Stream => {
                 ui.label("send buffer");
-                ui.add(egui::Slider::new(&mut direction.send_buffer, 1024..=256 * 1024).logarithmic(true).suffix(" B"));
+                ui.add(
+                    egui::Slider::new(&mut direction.send_buffer, 1024..=256 * 1024)
+                        .logarithmic(true)
+                        .suffix(" B"),
+                );
                 ui.end_row();
             }
             Mode::Datagram => {
@@ -183,8 +210,17 @@ fn direction(ui: &mut egui::Ui, id: &str, direction: &mut Direction, mode: Mode)
 fn millis(ui: &mut egui::Ui, label: &str, value: &mut Duration, max: f64) {
     ui.label(label);
     let mut ms = value.as_secs_f64() * 1000.0;
-    let slider = egui::Slider::new(&mut ms, 0.0..=max).suffix(" ms").max_decimals(0);
-    if ui.add(if max > 2000.0 { slider.logarithmic(true) } else { slider }).changed() {
+    let slider = egui::Slider::new(&mut ms, 0.0..=max)
+        .suffix(" ms")
+        .max_decimals(0);
+    if ui
+        .add(if max > 2000.0 {
+            slider.logarithmic(true)
+        } else {
+            slider
+        })
+        .changed()
+    {
         *value = Duration::from_millis(ms.round() as u64);
     }
     ui.end_row();
@@ -192,45 +228,86 @@ fn millis(ui: &mut egui::Ui, label: &str, value: &mut Duration, max: f64) {
 
 fn percent(ui: &mut egui::Ui, label: &str, value: &mut f32, max: f32) {
     ui.label(label);
-    ui.add(egui::Slider::new(value, 0.0..=max).suffix(" %").max_decimals(1));
+    ui.add(
+        egui::Slider::new(value, 0.0..=max)
+            .suffix(" %")
+            .max_decimals(1),
+    );
     ui.end_row();
 }
 
 /// What the links hold and have done, and the last few seconds of delay.
 fn live(ui: &mut egui::Ui, link: &ConditionedLink) {
     let (up, down) = (link.up().stats(), link.down().stats());
-    egui::Grid::new("live").num_columns(3).striped(true).show(ui, |ui| {
-        ui.label("");
-        ui.colored_label(UP_COLOR, "up");
-        ui.colored_label(DOWN_COLOR, "down");
-        ui.end_row();
-        let mut row = |label: &str, up: String, down: String| {
-            ui.label(label);
-            ui.monospace(up);
-            ui.monospace(down);
+    egui::Grid::new("live")
+        .num_columns(3)
+        .striped(true)
+        .show(ui, |ui| {
+            ui.label("");
+            ui.colored_label(UP_COLOR, "up");
+            ui.colored_label(DOWN_COLOR, "down");
             ui.end_row();
-        };
-        let ms = |duration: Duration| format!("{:.0} ms", duration.as_secs_f64() * 1000.0);
-        row("delay", ms(up.last_delay), ms(down.last_delay));
-        row("stall", ms(up.stall), ms(down.stall));
-        let held = |stats: &crate::Stats| format!("{} / {:.1} KiB", stats.queued, stats.queued_bytes as f64 / 1024.0);
-        row("held", held(up), held(down));
-        row("sent", up.sent.to_string(), down.sent.to_string());
-        row("lost on wire", up.lost.to_string(), down.lost.to_string());
-        if link.up().mode() == Mode::Stream {
-            row("retransmits", up.retransmits.to_string(), down.retransmits.to_string());
-            row("timeouts", up.timeouts.to_string(), down.timeouts.to_string());
-            row("send door drops", up.dropped.to_string(), down.dropped.to_string());
-        } else {
-            row("queue drops", up.dropped.to_string(), down.dropped.to_string());
-            row("duplicated", up.duplicated.to_string(), down.duplicated.to_string());
-        }
-    });
-    sparkline(ui, link.now(), [(link.up(), UP_COLOR), (link.down(), DOWN_COLOR)]);
+            let mut row = |label: &str, up: String, down: String| {
+                ui.label(label);
+                ui.monospace(up);
+                ui.monospace(down);
+                ui.end_row();
+            };
+            let ms = |duration: Duration| format!("{:.0} ms", duration.as_secs_f64() * 1000.0);
+            row("delay", ms(up.last_delay), ms(down.last_delay));
+            row("stall", ms(up.stall), ms(down.stall));
+            let held = |stats: &crate::Stats| {
+                format!(
+                    "{} / {:.1} KiB",
+                    stats.queued,
+                    stats.queued_bytes as f64 / 1024.0
+                )
+            };
+            row("held", held(up), held(down));
+            row("sent", up.sent.to_string(), down.sent.to_string());
+            row("lost on wire", up.lost.to_string(), down.lost.to_string());
+            if link.up().mode() == Mode::Stream {
+                row(
+                    "retransmits",
+                    up.retransmits.to_string(),
+                    down.retransmits.to_string(),
+                );
+                row(
+                    "timeouts",
+                    up.timeouts.to_string(),
+                    down.timeouts.to_string(),
+                );
+                row(
+                    "send door drops",
+                    up.dropped.to_string(),
+                    down.dropped.to_string(),
+                );
+            } else {
+                row(
+                    "queue drops",
+                    up.dropped.to_string(),
+                    down.dropped.to_string(),
+                );
+                row(
+                    "duplicated",
+                    up.duplicated.to_string(),
+                    down.duplicated.to_string(),
+                );
+            }
+        });
+    sparkline(
+        ui,
+        link.now(),
+        [(link.up(), UP_COLOR), (link.down(), DOWN_COLOR)],
+    );
 }
 
 /// One-way delay of each packet delivered in the last five seconds.
-fn sparkline(ui: &mut egui::Ui, now: Duration, links: [(&Link<aeronet_io::bytes::Bytes>, egui::Color32); 2]) {
+fn sparkline(
+    ui: &mut egui::Ui,
+    now: Duration,
+    links: [(&Link<aeronet_io::bytes::Bytes>, egui::Color32); 2],
+) {
     let size = egui::vec2(ui.available_width(), 70.0);
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
     let painter = ui.painter_at(rect);

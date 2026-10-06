@@ -32,7 +32,14 @@ impl<T> Default for Datagram<T> {
 }
 
 impl<T: Clone> Datagram<T> {
-    pub(super) fn push(&mut self, path: &mut Path, stats: &mut Stats, now: Duration, item: T, len: usize) {
+    pub(super) fn push(
+        &mut self,
+        path: &mut Path,
+        stats: &mut Stats,
+        now: Duration,
+        item: T,
+        len: usize,
+    ) {
         if path.lost(now) {
             stats.lost += 1;
             return;
@@ -86,7 +93,10 @@ impl<T> Datagram<T> {
     pub(super) fn drain(self) -> Vec<T> {
         let mut flying = self.flying.into_vec();
         flying.sort_by_key(|Reverse(flying)| (flying.arrival, flying.seq));
-        flying.into_iter().map(|Reverse(flying)| flying.item).collect()
+        flying
+            .into_iter()
+            .map(|Reverse(flying)| flying.item)
+            .collect()
     }
 }
 
