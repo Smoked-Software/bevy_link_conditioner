@@ -30,6 +30,8 @@ pub struct Link<T> {
     released: VecDeque<T>,
     stats: Stats,
     history: VecDeque<(Duration, Duration)>,
+    /// The latest time seen: the model only moves forward.
+    clock: Duration,
 }
 
 enum Model<T> {
@@ -98,6 +100,7 @@ impl<T: Clone> Link<T> {
             released: VecDeque::new(),
             stats: Stats::default(),
             history: VecDeque::new(),
+            clock: Duration::ZERO,
         }
     }
 
@@ -132,8 +135,10 @@ impl<T: Clone> Link<T> {
         self.path.rtt()
     }
 
-    /// Sends `item` (`len` bytes of payload) at `now`.
+    /// Sends `item` (`len` bytes of payload) at `now`. Times run forward: an
+    /// earlier one counts as the latest seen.
     pub fn push(&mut self, now: Duration, item: T, len: usize) {
+        let now = self.tick(now);
         self.stats.sent += 1;
         match &mut self.model {
             Model::Stream(stream) => stream.push(&mut self.path, &mut self.stats, now, item, len),
@@ -144,6 +149,7 @@ impl<T: Clone> Link<T> {
 
     /// The next packet that has arrived by `now`, if any.
     pub fn pop_ready(&mut self, now: Duration) -> Option<T> {
+        let now = self.tick(now);
         if let Some(item) = self.released.pop_front() {
             self.stats.delivered += 1;
             return Some(item);
@@ -182,6 +188,11 @@ impl<T: Clone> Link<T> {
     /// [`HISTORY`], oldest first.
     pub fn history(&self) -> impl ExactSizeIterator<Item = (Duration, Duration)> + '_ {
         self.history.iter().copied()
+    }
+
+    fn tick(&mut self, now: Duration) -> Duration {
+        self.clock = self.clock.max(now);
+        self.clock
     }
 
     fn refresh(&mut self, now: Duration) {

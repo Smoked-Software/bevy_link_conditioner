@@ -209,10 +209,14 @@ fn condition_incoming(mut sessions: Query<(&mut Session, &mut ConditionedLink)>)
     for (mut session, mut link) in &mut sessions {
         let now = Instant::now();
         let at = now.saturating_duration_since(link.epoch);
+        let epoch = link.epoch;
         let (incoming, _) = link.ways();
         for packet in core::mem::take(&mut session.recv) {
+            // Sent when the IO layer got it, not at the next frame: a slow
+            // frame mustn't bunch up the emulated sender.
+            let sent = packet.recv_at.saturating_duration_since(epoch);
             let len = packet.payload.len();
-            incoming.push(at, packet.payload, len);
+            incoming.push(sent, packet.payload, len);
         }
         while let Some(payload) = incoming.pop_ready(at) {
             session.recv.push(RecvPacket { recv_at: now, payload });
