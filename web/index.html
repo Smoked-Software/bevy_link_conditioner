@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>bevy_link_conditioner</title>
+    <link rel="icon" href="data:,">
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        /* Bevy's clear color, so the page doesn't flash before the first frame. */
+        background: #2b2c2f;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        outline: none;
+      }
+
+      #status {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        color: #c8ccd6;
+        font: 700 18px/1.5 system-ui, sans-serif;
+        text-align: center;
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="bevy" tabindex="0"></canvas>
+    <div id="status">Loading</div>
+    <script type="module">
+      // Uncompressed engine size, filled in by the publish script (0 = unknown).
+      const WASM_BYTES = 0;
+
+      const status = document.getElementById("status");
+      addEventListener("contextmenu", (e) => e.preventDefault());
+
+      const canvas = document.getElementById("bevy");
+
+      if (!navigator.gpu) {
+        status.innerHTML = "WebGPU required (use Chrome/Edge)<br>" +
+          "<small>This browser has no <code>navigator.gpu</code>.</small>";
+      } else {
+        const { default: init } = await import("./panel.js");
+        if (WASM_BYTES) status.textContent = `Loading ${(WASM_BYTES / 1048576).toFixed(0)} MB`;
+        // Bevy sizes the canvas once its window exists: hide the label then.
+        new MutationObserver((_, observer) => {
+          observer.disconnect();
+          status.style.opacity = "0";
+        }).observe(canvas, { attributeFilter: ["width", "height"] });
+        try {
+          await init();
+        } catch (e) {
+          // winit ends its event loop by throwing; that one isn't a failure.
+          if (!String(e).includes("Using exceptions for control flow")) {
+            status.style.opacity = "1";
+            status.textContent = `Failed to start: ${e}`;
+            throw e;
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
