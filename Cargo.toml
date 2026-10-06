@@ -1,0 +1,40 @@
+[package]
+name = "bevy_link_conditioner"
+version = "0.1.0"
+edition = "2024"
+description = "A network conditioner for Bevy apps on aeronet: TCP-faithful stream stalls or datagram loss, live-tunable, reproducible."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[lints.clippy]
+# Bevy queries trip this; Bevy itself allows it.
+type_complexity = "allow"
+
+[features]
+default = ["bevy"]
+# The plugin: conditions every aeronet `Session` below its transport.
+bevy = ["dep:bevy", "dep:aeronet_io", "dep:aeronet_transport"]
+# The live panel.
+egui = ["bevy", "dep:bevy_egui"]
+
+[dependencies]
+aeronet_io = { version = "0.21", optional = true }
+aeronet_transport = { version = "0.21", optional = true }
+bevy = { version = "0.19", default-features = false, features = ["std", "bevy_log"], optional = true }
+bevy_egui = { version = "0.41", default-features = false, features = ["render", "default_fonts"], optional = true }
+
+[dev-dependencies]
+# The examples and tests use every feature, whatever the command line enables.
+bevy_link_conditioner = { path = ".", features = ["egui"] }
+aeronet_channel = "0.21"
+aeronet_replicon = { version = "0.21", default-features = false, features = ["client", "server"] }
+bevy = { version = "0.19", default-features = false, features = [
+    "std", "multi_threaded", "default_app", "bevy_winit", "x11", "wayland", "webgl2",
+    "2d_bevy_render", "bevy_gizmos", "bevy_text", "default_font", "serialize",
+] }
+bevy_replicon = { version = "0.41", default-features = false, features = ["client", "server"] }
+serde = { version = "1", features = ["derive"] }
+
+# `~/.claude/skills/wasm-fast/box-web-fast.sh` builds and publishes this one.
+[package.metadata.wasm-fast]
+example = "panel"
